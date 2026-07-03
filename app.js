@@ -16,7 +16,7 @@ let env = {
     FIREBASE_MESSAGING_SENDER_ID: d("MjA4Nzk0NTg2MjY2"),
     FIREBASE_APP_ID: d("MToyMDg3OTQ1ODYyNjY6d2ViOjYyNDBiMGVhODhmOGM5ZTUyMmEzMjM="),
     FIREBASE_MEASUREMENT_ID: d("Ry1KUjBKTERXTEVG"),
-    GOOGLE_SHEET_WEBAPP_URL: d("aHR0cHM6Ly9zY3JpcHQuZ29vZ2xlLmNvbS9tYWNyb3Mvcy9BS2Z5Y2J6M1RTWnlYbTJyRXg4aUswVjVWMENRSXIxOG5BbUdKNmcwTHp4LXZKMDUtSERsS1NqcDZTYkNTeGxxbHBlSWF3dy9leGVj")
+    GOOGLE_SHEET_WEBAPP_URL: d("aHR0cHM6Ly9zY3JpcHQuZ29vZ2xlLmNvbS9tYWNyb3Mvcy9BS2Z5Y2J6M1RTWnlYbTJyRXg4aUswVjVWMENRSXIxOG5BbUdKNmcwTHp4LXZKMDUtSERsS1NjanA2U2JDU3hscWxwZUlhd3cvZXhlYw==")
 };
 
 // Check if Firebase is properly configured
@@ -257,237 +257,38 @@ tailwind.config = {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-    // ─── OTP State ───────────────────────────────────────────────────────────────
-    let currentOtp = null;          // The 6-digit OTP string we generated (Demo Mode)
-    let confirmationResult = null;  // Firebase SMS confirmation object (Production Mode)
-    let otpTimerInterval = null;    // Countdown interval reference
-    let pendingOrderData = null;    // Holds form data while OTP is pending
+    // ─── CAPTCHA State & Logic ──────────────────────────────────────────────────
+    let currentCaptchaVal = "";
 
-    // ─── OTP Modal Elements ───────────────────────────────────────────────────────
-    const otpModalOverlay = document.getElementById('otpModalOverlay');
-    const otpModalCard    = document.getElementById('otpModalCard');
-    const otpInputGroup   = document.getElementById('otpInputGroup');
-    const otpBoxes        = otpInputGroup ? Array.from(otpInputGroup.querySelectorAll('.otp-box')) : [];
-    const otpError        = document.getElementById('otpError');
-    const otpSentMsg      = document.getElementById('otpSentMsg');
-    const otpTimerEl      = document.getElementById('otpTimer');
-    const otpTimerText    = document.getElementById('otpTimerText');
-    const resendOtpBtn    = document.getElementById('resendOtpBtn');
-    const cancelOtpBtn    = document.getElementById('cancelOtpBtn');
-    const verifyOtpBtn    = document.getElementById('verifyOtpBtn');
-
-    /** Open OTP modal with animation */
-    function openOtpModal() {
-        otpModalOverlay.classList.remove('opacity-0', 'pointer-events-none');
-        otpModalCard.classList.remove('scale-95');
-        otpModalCard.classList.add('scale-100');
-        // Focus first box after transition
-        setTimeout(() => otpBoxes[0] && otpBoxes[0].focus(), 300);
-    }
-
-    /** Close OTP modal and reset state */
-    function closeOtpModal() {
-        otpModalOverlay.classList.add('opacity-0', 'pointer-events-none');
-        otpModalCard.classList.remove('scale-100');
-        otpModalCard.classList.add('scale-95');
-        clearInterval(otpTimerInterval);
-        resetOtpBoxes();
-        if (otpError)  otpError.classList.add('hidden');
-    }
-
-    /** Reset OTP input boxes to empty */
-    function resetOtpBoxes() {
-        otpBoxes.forEach(box => { box.value = ''; box.classList.remove('border-error', 'border-secondary'); });
-    }
-
-    /** Generate a random 6-digit OTP string */
-    function generateOtp() {
-        return Math.floor(100000 + Math.random() * 900000).toString();
-    }
-
-    /** Start 30-second countdown; shows Resend button when expired */
-    function startOtpTimer(seconds = 30) {
-        clearInterval(otpTimerInterval);
-        let remaining = seconds;
-        if (otpTimerEl)   otpTimerEl.textContent = remaining;
-        if (otpTimerText) otpTimerText.classList.remove('hidden');
-        if (resendOtpBtn) resendOtpBtn.classList.add('hidden');
-
-        otpTimerInterval = setInterval(() => {
-            remaining -= 1;
-            if (otpTimerEl) otpTimerEl.textContent = remaining;
-            if (remaining <= 0) {
-                clearInterval(otpTimerInterval);
-                if (otpTimerText) otpTimerText.classList.add('hidden');
-                if (resendOtpBtn) resendOtpBtn.classList.remove('hidden');
-            }
-        }, 1000);
-    }
-
-    /**
-     * Send OTP via SMS gateway.
-     * Currently uses a demo simulation — replace the fetch() call inside
-     * with your real SMS API (e.g. MSG91, Fast2SMS, Twilio) when ready.
-     */
-    async function sendOtpToPhone(phone, otp) {
-        // ── DEMO MODE ──────────────────────────────────────────────────────────────
-        // In production, remove the lines below and call your SMS API instead.
-        console.log(`[OTP DEMO] Sending OTP ${otp} to +91${phone}`);
-        showToast("सत्यापन कोड (OTP)", `[डेमो] आपका OTP है: ${otp}`, true);
-        return true;
-    }
-
-    // ─── OTP Box — auto-advance & backspace navigation ────────────────────────────
-    otpBoxes.forEach((box, idx) => {
-        box.addEventListener('input', (e) => {
-            const val = e.target.value.replace(/[^0-9]/g, '');
-            box.value = val.slice(-1);    // Keep only last digit typed
-            if (val && idx < otpBoxes.length - 1) otpBoxes[idx + 1].focus();
-            // Auto-verify when last digit is filled
-            if (idx === otpBoxes.length - 1 && box.value) verifyOtp();
-        });
-        box.addEventListener('keydown', (e) => {
-            if (e.key === 'Backspace' && !box.value && idx > 0) otpBoxes[idx - 1].focus();
-        });
-        // Handle paste: distribute digits across boxes
-        box.addEventListener('paste', (e) => {
-            e.preventDefault();
-            const pasted = (e.clipboardData || window.clipboardData).getData('text').replace(/[^0-9]/g, '');
-            if (pasted.length >= otpBoxes.length) {
-                otpBoxes.forEach((b, i) => { b.value = pasted[i] || ''; });
-                otpBoxes[otpBoxes.length - 1].focus();
-                verifyOtp();
-            }
-        });
-    });
-
-    /** Read entered OTP digits and return as a string */
-    function getEnteredOtp() {
-        return otpBoxes.map(b => b.value).join('');
-    }
-
-    /** Verify the entered OTP (Firebase vs. Demo fallback) */
-    function verifyOtp() {
-        const entered = getEnteredOtp();
-        if (entered.length < 6) return; // Not fully filled yet
-
-        if (verifyOtpBtn) {
-            verifyOtpBtn.disabled = true;
-            verifyOtpBtn.textContent = 'सत्यापित किया जा रहा है...';
+    function generateCaptcha() {
+        const chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        let result = "";
+        for (let i = 0; i < 5; i++) {
+            result += chars.charAt(Math.floor(Math.random() * chars.length));
         }
+        return result;
+    }
 
-        if (isFirebaseConfigured && confirmationResult) {
-            confirmationResult.confirm(entered)
-                .then((result) => {
-                    // ✅ Correct OTP
-                    otpBoxes.forEach(b => { b.classList.remove('border-error'); b.classList.add('border-secondary'); });
-                    if (otpError) otpError.classList.add('hidden');
-                    if (verifyOtpBtn) { verifyOtpBtn.disabled = true; verifyOtpBtn.textContent = 'सत्यापित ✓'; }
-                    clearInterval(otpTimerInterval);
-
-                    // Short delay for visual feedback, then complete the order
-                    setTimeout(() => {
-                        closeOtpModal();
-                        completeOrder();
-                    }, 600);
-                })
-                .catch((error) => {
-                    console.error("Firebase OTP verification failed:", error);
-                    // ❌ Wrong OTP
-                    otpBoxes.forEach(b => b.classList.add('border-error'));
-                    if (otpError) otpError.classList.remove('hidden');
-                    if (verifyOtpBtn) { verifyOtpBtn.disabled = false; verifyOtpBtn.textContent = 'सत्यापित करें'; }
-                    resetOtpBoxes();
-                    otpBoxes[0].focus();
-                });
-        } else {
-            // ─── DEMO MODE FALLBACK ───────────────────────────────────────────────
-            if (entered === currentOtp) {
-                // ✅ Correct OTP — mark boxes green, then complete the order
-                otpBoxes.forEach(b => { b.classList.remove('border-error'); b.classList.add('border-secondary'); });
-                if (otpError) otpError.classList.add('hidden');
-                if (verifyOtpBtn) { verifyOtpBtn.disabled = true; verifyOtpBtn.textContent = 'सत्यापित ✓'; }
-                clearInterval(otpTimerInterval);
-
-                // Short delay for visual feedback, then complete the order
-                setTimeout(() => {
-                    closeOtpModal();
-                    completeOrder();
-                }, 600);
-            } else {
-                // ❌ Wrong OTP — shake boxes and show error
-                otpBoxes.forEach(b => b.classList.add('border-error'));
-                if (otpError) otpError.classList.remove('hidden');
-                if (verifyOtpBtn) { verifyOtpBtn.disabled = false; verifyOtpBtn.textContent = 'सत्यापित करें'; }
-                resetOtpBoxes();
-                otpBoxes[0].focus();
-            }
+    function refreshCaptcha() {
+        const captchaCodeBox = document.getElementById('captchaCodeBox');
+        if (captchaCodeBox) {
+            currentCaptchaVal = generateCaptcha();
+            captchaCodeBox.innerText = currentCaptchaVal;
+        }
+        const orderCaptchaInput = document.getElementById('orderCaptchaInput');
+        if (orderCaptchaInput) {
+            orderCaptchaInput.value = "";
         }
     }
 
-    /** After OTP verified, submit data to Google Sheet and open dialer */
-    function completeOrder() {
-        if (!pendingOrderData) return;
-        const { name, cleanPhone, address, submitBtn, originalBtnText } = pendingOrderData;
+    // Initialize captcha
+    refreshCaptcha();
 
-        sendDataToGoogleSheet({
-            formType: "Order",
-            name,
-            phone: cleanPhone,
-            address,
-            city: "",
-            rating: "",
-            message: ""
-        }).then(() => {
-            window.location.href = "tel:+916352975326";
-            showToast('सफलता', `धन्यवाद, ${name}! आपका ऑर्डर दर्ज कर लिया गया है। हम आपसे शीघ्र ही संपर्क करेंगे।`, true);
-            document.getElementById('orderForm').reset();
-        }).catch(() => {
-            showToast('त्रुटि', 'कुछ समस्या आई, कृपया पुनः प्रयास करें।', false);
-        }).finally(() => {
-            pendingOrderData = null;
-            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
-        });
+    // Bind refresh button click
+    const btnRefreshCaptcha = document.getElementById('btnRefreshCaptcha');
+    if (btnRefreshCaptcha) {
+        btnRefreshCaptcha.addEventListener('click', refreshCaptcha);
     }
-
-    // ─── Verify button click ──────────────────────────────────────────────────────
-    if (verifyOtpBtn) verifyOtpBtn.addEventListener('click', verifyOtp);
-
-    // ─── Cancel / close modal ─────────────────────────────────────────────────────
-    if (cancelOtpBtn) cancelOtpBtn.addEventListener('click', () => {
-        closeOtpModal();
-        pendingOrderData = null;
-        // Re-enable submit button
-        const submitBtn = document.getElementById('orderSubmitBtn');
-        if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = `<span class="material-symbols-outlined text-xl" style="font-variation-settings: 'FILL' 1;">call</span> कॉल करें`; }
-    });
-
-    // ─── Resend OTP ───────────────────────────────────────────────────────────────
-    if (resendOtpBtn) resendOtpBtn.addEventListener('click', async () => {
-        if (!pendingOrderData) return;
-        resetOtpBoxes();
-        if (otpError) otpError.classList.add('hidden');
-        if (verifyOtpBtn) { verifyOtpBtn.disabled = false; verifyOtpBtn.textContent = 'सत्यापित करें'; }
-
-        if (isFirebaseConfigured) {
-            const phoneNumber = `+91${pendingOrderData.cleanPhone}`;
-            firebase.auth().signInWithPhoneNumber(phoneNumber, window.recaptchaVerifier)
-                .then((result) => {
-                    confirmationResult = result;
-                    startOtpTimer();
-                    otpBoxes[0].focus();
-                })
-                .catch((error) => {
-                    console.error("Error resending Firebase OTP:", error);
-                    showToast('त्रुटि', 'OTP पुनः भेजने में असमर्थ। कृपया बाद में प्रयास करें।', false);
-                });
-        } else {
-            currentOtp = generateOtp();
-            await sendOtpToPhone(pendingOrderData.cleanPhone, currentOtp);
-            startOtpTimer();
-            otpBoxes[0].focus();
-        }
-    });
 
     // ─── Order Form Submit Handler ────────────────────────────────────────────────
     const orderForm = document.getElementById('orderForm');
@@ -520,67 +321,46 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            // Validate CAPTCHA
+            const orderCaptchaInput = document.getElementById('orderCaptchaInput');
+            const userCaptcha = orderCaptchaInput ? orderCaptchaInput.value.trim() : '';
+            if (userCaptcha !== currentCaptchaVal) {
+                showToast('चेतावनी', 'कृपया सही सुरक्षा कोड (कैप्चा) दर्ज करें।', false);
+                if (orderCaptchaInput) orderCaptchaInput.value = '';
+                refreshCaptcha();
+                return;
+            }
+
             // Disable button while processing
             const submitBtn = document.getElementById('orderSubmitBtn');
             const originalBtnText = submitBtn ? submitBtn.innerHTML : '';
             if (submitBtn) {
                 submitBtn.disabled = true;
-                submitBtn.innerHTML = '<span class="material-symbols-outlined text-xl animate-spin">progress_activity</span> OTP भेजा जा रहा है...';
+                submitBtn.innerHTML = '<span class="material-symbols-outlined text-xl animate-spin">progress_activity</span> ऑर्डर भेजा जा रहा है...';
             }
 
-            // Store pending data
-            pendingOrderData = { name, cleanPhone, address, submitBtn, originalBtnText };
-
-            if (isFirebaseConfigured) {
-                const phoneNumber = `+91${cleanPhone}`;
-                
-                if (!window.recaptchaVerifier) {
-                    try {
-                        window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
-                            'size': 'invisible'
-                        });
-                    } catch (error) {
-                        console.error("Error initializing RecaptchaVerifier:", error);
-                        showToast('त्रुटि', 'reCAPTCHA सत्यापन प्रारंभ करने में विफल। कृपया पृष्ठ को रीफ़्रेश करें।', false);
-                        if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
-                        return;
-                    }
+            // Direct submission to Google Sheets Web App
+            sendDataToGoogleSheet({
+                formType: "Order",
+                name: name,
+                phone: cleanPhone,
+                address: address,
+                city: "",
+                rating: "",
+                message: ""
+            }).then(() => {
+                showToast('सफलता', `धन्यवाद, ${name}! आपका ऑर्डर दर्ज कर लिया गया है। हम आपसे शीघ्र ही संपर्क करेंगे।`, true);
+                if (orderForm) orderForm.reset();
+                refreshCaptcha();
+            }).catch((error) => {
+                console.error("Order submit failed:", error);
+                showToast('त्रुटि', 'कुछ समस्या आई, कृपया पुनः प्रयास करें।', false);
+            }).finally(() => {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalBtnText;
                 }
-
-                firebase.auth().signInWithPhoneNumber(phoneNumber, window.recaptchaVerifier)
-                    .then((result) => {
-                        confirmationResult = result;
-                        if (otpSentMsg) otpSentMsg.textContent = `+91 ${cleanPhone} पर OTP भेजा गया है।`;
-                        openOtpModal();
-                        startOtpTimer();
-                        if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
-                    })
-                    .catch((error) => {
-                        console.error("Error signing in with phone number:", error);
-                        showToast('त्रुटि', 'OTP भेजने में असमर्थ। कृपया सुनिश्चित करें कि नंबर सही है और Firebase कॉन्फ़िगरेशन सही है।', false);
-                        if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
-                        pendingOrderData = null;
-                    });
-            } else {
-                // Fallback / Demo Mode
-                currentOtp = generateOtp();
-                if (otpSentMsg) otpSentMsg.textContent = `+91 ${cleanPhone} पर OTP भेजा गया है (डेमो मोड)।`;
-
-                const sent = await sendOtpToPhone(cleanPhone, currentOtp);
-                if (!sent) {
-                    showToast('त्रुटि', 'OTP भेजने में समस्या आई। कृपया पुनः प्रयास करें।', false);
-                    if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
-                    pendingOrderData = null;
-                    return;
-                }
-
-                // Open modal & start timer
-                openOtpModal();
-                startOtpTimer();
-
-                // Re-enable the page submit button
-                if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
-            }
+            });
         });
     }
 
