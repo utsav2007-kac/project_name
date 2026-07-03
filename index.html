@@ -491,6 +491,18 @@
     <!-- Invisible ReCaptcha Container for Firebase Phone Auth -->
     <div id="recaptcha-container"></div>
 
+    <!-- Custom Theme Toast Success Message Notification Box -->
+    <div id="toastNotification" class="hidden fixed top-4 left-1/2 -translate-x-1/2 z-[200] max-w-sm w-[90%] bg-surface border border-outline-variant/30 p-4 rounded-2xl shadow-2xl flex items-center gap-3 transform -translate-y-10 opacity-0 transition-all duration-300">
+        <div class="w-10 h-10 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center shrink-0">
+            <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+        </div>
+        <div class="flex-1">
+            <h4 id="toastTitle" class="font-bold text-sm text-on-surface">सफलता</h4>
+            <p id="toastMessage" class="text-xs text-on-surface-variant">आपका ऑर्डर सफलतापूर्वक प्राप्त हो गया है।</p>
+        </div>
+        <button id="closeToastBtn" class="text-on-surface-variant hover:text-primary transition-colors">
+            <span class="material-symbols-outlined text-sm">close</span>
+        </button>
+    </div>
 </body>
-
 </html>
