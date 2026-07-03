@@ -1,13 +1,13 @@
-// Environment Variables Config (Pre-configured defaults for local fallback)
+// Environment Variables Config (Empty by default; loaded dynamically from .env at runtime)
 let env = {
-    FIREBASE_API_KEY: "AIzaSyCT6lioXgUNrOAnhjuyxT23n_wBujmdrzw",
-    FIREBASE_AUTH_DOMAIN: "amrutjeevan-ayurveda.firebaseapp.com",
-    FIREBASE_PROJECT_ID: "amrutjeevan-ayurveda",
-    FIREBASE_STORAGE_BUCKET: "amrutjeevan-ayurveda.firebasestorage.app",
-    FIREBASE_MESSAGING_SENDER_ID: "208794586266",
-    FIREBASE_APP_ID: "1:208794586266:web:6240b0ea88f8c9e522a323",
-    FIREBASE_MEASUREMENT_ID: "G-JR0JTDWLEF",
-    GOOGLE_SHEET_WEBAPP_URL: "https://script.google.com/macros/s/AKfycbz3TSZyXm2rEx8iK0V5V0CQIr18nAmGJ6g0Lzx-vJ05-HDlKScjp6SbCSxlqlpeIaww/exec"
+    FIREBASE_API_KEY: "",
+    FIREBASE_AUTH_DOMAIN: "",
+    FIREBASE_PROJECT_ID: "",
+    FIREBASE_STORAGE_BUCKET: "",
+    FIREBASE_MESSAGING_SENDER_ID: "",
+    FIREBASE_APP_ID: "",
+    FIREBASE_MEASUREMENT_ID: "",
+    GOOGLE_SHEET_WEBAPP_URL: ""
 };
 
 // Check if Firebase is properly configured
@@ -511,6 +511,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Re-enable the page submit button
                 if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
             }
+        });
+    }
+
+    const btnCallNow = document.getElementById('btnCallNow');
+    if (btnCallNow) {
+        btnCallNow.addEventListener('click', () => {
+            window.location.href = "tel:+916352975326";
         });
     }
 
