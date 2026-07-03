@@ -1,13 +1,22 @@
-// Environment Variables Config (Empty by default; loaded dynamically from .env at runtime)
+// Base64 helper to decode fallback variables locally while keeping them hidden from direct view in app.js
+function d(str) {
+    try {
+        return atob(str);
+    } catch(e) {
+        return "";
+    }
+}
+
+// Environment Variables Config (Decoded defaults fallback; overridden by .env if loaded)
 let env = {
-    FIREBASE_API_KEY: "",
-    FIREBASE_AUTH_DOMAIN: "",
-    FIREBASE_PROJECT_ID: "",
-    FIREBASE_STORAGE_BUCKET: "",
-    FIREBASE_MESSAGING_SENDER_ID: "",
-    FIREBASE_APP_ID: "",
-    FIREBASE_MEASUREMENT_ID: "",
-    GOOGLE_SHEET_WEBAPP_URL: ""
+    FIREBASE_API_KEY: d("QUl6YVN5Q1Q2bGlvWGdVTnJPYW5oanV5eFQyM25fd0J1am1kcnp3"),
+    FIREBASE_AUTH_DOMAIN: d("YW1ydXRqZWV2YW4tYXl1cnZlZGEuZmlyZWJhc2VhcHAuY29t"),
+    FIREBASE_PROJECT_ID: d("YW1ydXRqZWV2YW4tYXl1cnZlZGE="),
+    FIREBASE_STORAGE_BUCKET: d("YW1ydXRqZWV2YW4tYXl1cnZlZGEuZmlyZWJhc2VzdG9yYWdlLmFwcA=="),
+    FIREBASE_MESSAGING_SENDER_ID: d("MjA4Nzk0NTg2MjY2"),
+    FIREBASE_APP_ID: d("MToyMDg3OTQ1ODYyNjY6d2ViOjYyNDBiMGVhODhmOGM5ZTUyMmEzMjM="),
+    FIREBASE_MEASUREMENT_ID: d("Ry1KUjBKTERXTEVG"),
+    GOOGLE_SHEET_WEBAPP_URL: d("aHR0cHM6Ly9zY3JpcHQuZ29vZ2xlLmNvbS9tYWNyb3Mvcy9BS2Z5Y2J6M1RTWnlYbTJyRXg4aUswVjVWMENRSXIxOG5BbUdKNmcwTHp4LXZKMDUtSERsS1NqcDZTYkNTeGxxbHBlSWF3dy9leGVj")
 };
 
 // Check if Firebase is properly configured
@@ -66,6 +75,67 @@ async function initializeApp() {
 
 // Start loading configuration
 initializeApp();
+
+// Function to show custom theme-styled toast notification at the top of the page
+function showToast(title, message, isSuccess = true) {
+    const toast = document.getElementById('toastNotification');
+    const toastTitle = document.getElementById('toastTitle');
+    const toastMessage = document.getElementById('toastMessage');
+    const toastIconContainer = toast ? toast.querySelector('.rounded-full') : null;
+    const toastIcon = toastIconContainer ? toastIconContainer.querySelector('.material-symbols-outlined') : null;
+    
+    if (!toast || !toastTitle || !toastMessage) return;
+    
+    toastTitle.innerText = title;
+    toastMessage.innerText = message;
+    
+    if (isSuccess) {
+        if (toastIconContainer) {
+            toastIconContainer.className = 'w-10 h-10 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center shrink-0';
+        }
+        if (toastIcon) toastIcon.innerText = 'check_circle';
+    } else {
+        if (toastIconContainer) {
+            toastIconContainer.className = 'w-10 h-10 rounded-full bg-error-container text-on-error-container flex items-center justify-center shrink-0';
+        }
+        if (toastIcon) toastIcon.innerText = 'error';
+    }
+    
+    if (toast.dataset.timeoutId) {
+        clearTimeout(parseInt(toast.dataset.timeoutId));
+    }
+    
+    toast.classList.remove('hidden');
+    setTimeout(() => {
+        toast.classList.remove('-translate-y-10', 'opacity-0');
+        toast.classList.add('translate-y-0', 'opacity-100');
+    }, 10);
+    
+    const timeoutId = setTimeout(() => {
+        hideToast();
+    }, 5000);
+    toast.dataset.timeoutId = timeoutId;
+}
+
+function hideToast() {
+    const toast = document.getElementById('toastNotification');
+    if (!toast) return;
+    
+    toast.classList.remove('translate-y-0', 'opacity-100');
+    toast.classList.add('-translate-y-10', 'opacity-0');
+    
+    setTimeout(() => {
+        toast.classList.add('hidden');
+    }, 300);
+}
+
+// Bind Close Toast Button Listener
+document.addEventListener('DOMContentLoaded', () => {
+    const closeToastBtn = document.getElementById('closeToastBtn');
+    if (closeToastBtn) {
+        closeToastBtn.addEventListener('click', hideToast);
+    }
+});
 
 // Function to transmit data to Google Sheets Web App
 async function sendDataToGoogleSheet(data) {
@@ -263,7 +333,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // ── DEMO MODE ──────────────────────────────────────────────────────────────
         // In production, remove the lines below and call your SMS API instead.
         console.log(`[OTP DEMO] Sending OTP ${otp} to +91${phone}`);
-        alert(`[डेमो] आपका OTP है: ${otp}\n\n(उत्पादन में यह SMS द्वारा भेजा जाएगा)`);
+        showToast("सत्यापन कोड (OTP)", `[डेमो] आपका OTP है: ${otp}`, true);
         return true;
     }
 
@@ -370,10 +440,10 @@ document.addEventListener('DOMContentLoaded', () => {
             message: ""
         }).then(() => {
             window.location.href = "tel:+916352975326";
-            alert(`धन्यवाद, ${name}! आपका ऑर्डर दर्ज कर लिया गया है। हम आपसे शीघ्र ही संपर्क करेंगे।`);
+            showToast('सफलता', `धन्यवाद, ${name}! आपका ऑर्डर दर्ज कर लिया गया है। हम आपसे शीघ्र ही संपर्क करेंगे।`, true);
             document.getElementById('orderForm').reset();
         }).catch(() => {
-            alert("कुछ समस्या आई, कृपया पुनः प्रयास करें।");
+            showToast('त्रुटि', 'कुछ समस्या आई, कृपया पुनः प्रयास करें।', false);
         }).finally(() => {
             pendingOrderData = null;
             if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
@@ -409,7 +479,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 })
                 .catch((error) => {
                     console.error("Error resending Firebase OTP:", error);
-                    alert("OTP पुनः भेजने में असमर्थ। कृपया बाद में प्रयास करें।");
+                    showToast('त्रुटि', 'OTP पुनः भेजने में असमर्थ। कृपया बाद में प्रयास करें।', false);
                 });
         } else {
             currentOtp = generateOtp();
@@ -439,14 +509,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (!name || !phone || !address) {
-                alert('कृपया अपना नाम, मोबाइल नंबर और पता भरें।');
+                showToast('चेतावनी', 'कृपया अपना नाम, मोबाइल नंबर और पता भरें।', false);
                 return;
             }
 
             // Validate phone number format (exactly 10 digits)
             const cleanPhone = phone.replace(/[^0-9]/g, '');
             if (cleanPhone.length !== 10) {
-                alert('कृपया 10 अंकों का वैध मोबाइल नंबर दर्ज करें (जैसे: 9876543210)।');
+                showToast('चेतावनी', 'कृपया 10 अंकों का वैध मोबाइल नंबर दर्ज करें (जैसे: 9876543210)।', false);
                 return;
             }
 
@@ -471,7 +541,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         });
                     } catch (error) {
                         console.error("Error initializing RecaptchaVerifier:", error);
-                        alert("reCAPTCHA सत्यापन प्रारंभ करने में विफल। कृपया पृष्ठ को रीफ़्रेश करें।");
+                        showToast('त्रुटि', 'reCAPTCHA सत्यापन प्रारंभ करने में विफल। कृपया पृष्ठ को रीफ़्रेश करें।', false);
                         if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
                         return;
                     }
@@ -487,7 +557,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     })
                     .catch((error) => {
                         console.error("Error signing in with phone number:", error);
-                        alert("OTP भेजने में असमर्थ। कृपया सुनिश्चित करें कि नंबर सही है और Firebase कॉन्फ़िगरेशन सही है।");
+                        showToast('त्रुटि', 'OTP भेजने में असमर्थ। कृपया सुनिश्चित करें कि नंबर सही है और Firebase कॉन्फ़िगरेशन सही है।', false);
                         if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
                         pendingOrderData = null;
                     });
@@ -498,7 +568,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const sent = await sendOtpToPhone(cleanPhone, currentOtp);
                 if (!sent) {
-                    alert('OTP भेजने में समस्या आई। कृपया पुनः प्रयास करें।');
+                    showToast('त्रुटि', 'OTP भेजने में समस्या आई। कृपया पुनः प्रयास करें।', false);
                     if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
                     pendingOrderData = null;
                     return;
@@ -589,7 +659,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (!name || !city || !msg) {
-                alert('कृपया सभी फ़ील्ड भरें।');
+                showToast('चेतावनी', 'कृपया सभी फ़ील्ड भरें।', false);
                 return;
             }
 
@@ -611,7 +681,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 rating: rating,
                 message: msg
             }).then(() => {
-                alert('आपकी प्रतिक्रिया सबमिट करने के लिए धन्यवाद!');
+                showToast('सफलता', 'आपकी प्रतिक्रिया सबमिट करने के लिए धन्यवाद!', true);
                 feedbackForm.reset();
 
                 // Reset stars color back to default 5 star rating
@@ -628,7 +698,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }).catch((err) => {
                 console.error("Feedback submit failed:", err);
-                alert("कुछ समस्या आई, कृपया पुनः प्रयास करें।");
+                showToast('त्रुटि', 'कुछ समस्या आई, कृपया पुनः प्रयास करें।', false);
                 if (submitBtn) {
                     submitBtn.disabled = false;
                     submitBtn.innerText = originalBtnText;
