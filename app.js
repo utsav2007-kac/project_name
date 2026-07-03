@@ -367,7 +367,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnCallNow = document.getElementById('btnCallNow');
     if (btnCallNow) {
         btnCallNow.addEventListener('click', () => {
-            window.location.href = "tel:+916352975326";
+            window.location.href = "tel:+919714360416";
         });
     }
 
